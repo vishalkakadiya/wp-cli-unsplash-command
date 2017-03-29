@@ -84,7 +84,7 @@ class WP_CLI_Unsplash_Command extends WP_CLI_Command {
 		$info       = pathinfo( $tmp_file );
 		$name       = ( isset( $info['filename'] ) ? $info['filename'] : 'unsplash' );
 		$file_array = array(
-			'name'     => $name . '.jpeg',
+			'name'     => $name . array_rand( '.jpeg', '.gif', '.png'),
 			'type'     => $mime,
 			'tmp_name' => $tmp_file,
 			'error'    => 0,
