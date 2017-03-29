@@ -75,53 +75,63 @@ class WP_CLI_Unsplash_Command extends WP_CLI_Command {
 	 * @return bool
 	 */
 	private function _process_downloaded_image( $tmp_file, $media_author, $media_date ) {
-		if ( 'image/jpeg' !== ( $mime = mime_content_type( $tmp_file ) ) ) {
-			WP_CLI::warning( 'Invalid image type.' );
+		$mime = mime_content_type( $tmp_file );
+		if ( 'image/jpeg' === $mime || 'image/png' === $mime || 'image/gif' === $mime ) {
+			$info       = pathinfo( $tmp_file );
+			$name       = ( isset( $info['filename'] ) ? $info['filename'] : 'unsplash' );
 
-			return false;
+			switch ($mime) {
+			    case 'image/jpeg':
+				$ext = '.jpeg';
+				break;
+			    case 'image/png':
+				$ext = '.png';
+				break;
+			    case 'image/gif':
+				$ext = '.gif';
+				break;
+			}
+			
+			$file_array = array(
+				'name'     => $name . $ext,
+				'type'     => $mime,
+				'tmp_name' => $tmp_file,
+				'error'    => 0,
+				'size'     => filesize( $tmp_file ),
+			);
+
+			if ( 'random' === $media_date ) {
+				$timestamp  = current_time( 'timestamp' ) - mt_rand( 0, 315576000 ); // In last 10 years
+				$media_date = gmdate( 'Y-m-d H:i:s', $timestamp );
+			}
+
+			$file = wp_handle_sideload( $file_array, array( 'test_form' => false ), $media_date );
+
+			if ( isset( $file['error'] ) ) {
+				WP_CLI::warning( 'Error uploading file.' );
+
+				return false;
+			}
+
+			$attachment = array(
+				'post_mime_type' => $file['type'],
+				'guid'           => $file['url'],
+				'post_title'     => $name,
+				'post_author'    => $media_author,
+				'post_date'      => $media_date,
+			);
+
+			// Save the attachment metadata
+			$id = wp_insert_attachment( $attachment, $file['file'] );
+
+			if ( is_wp_error( $id ) ) {
+				WP_CLI::warning( 'Error creating attachment.' );
+
+				return false;
+			}
+
+			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $file['file'] ) );
 		}
-
-		$info       = pathinfo( $tmp_file );
-		$name       = ( isset( $info['filename'] ) ? $info['filename'] : 'unsplash' );
-		$file_array = array(
-			'name'     => $name . array_rand( '.jpeg', '.gif', '.png'),
-			'type'     => $mime,
-			'tmp_name' => $tmp_file,
-			'error'    => 0,
-			'size'     => filesize( $tmp_file ),
-		);
-
-		if ( 'random' === $media_date ) {
-			$timestamp  = current_time( 'timestamp' ) - mt_rand( 0, 315576000 ); // In last 10 years
-			$media_date = gmdate( 'Y-m-d H:i:s', $timestamp );
-		}
-
-		$file = wp_handle_sideload( $file_array, array( 'test_form' => false ), $media_date );
-
-		if ( isset( $file['error'] ) ) {
-			WP_CLI::warning( 'Error uploading file.' );
-
-			return false;
-		}
-
-		$attachment = array(
-			'post_mime_type' => $file['type'],
-			'guid'           => $file['url'],
-			'post_title'     => $name,
-			'post_author'    => $media_author,
-			'post_date'      => $media_date,
-		);
-
-		// Save the attachment metadata
-		$id = wp_insert_attachment( $attachment, $file['file'] );
-
-		if ( is_wp_error( $id ) ) {
-			WP_CLI::warning( 'Error creating attachment.' );
-
-			return false;
-		}
-
-		wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $file['file'] ) );
 	}
 }
 
